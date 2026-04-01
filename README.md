@@ -50,4 +50,6 @@ Then open:
 
 ## Notes
 
-This project was vibe coded with Claude Code and Cursor. ChatGPT was used to generate the initial `CLAUDE.md` rules file.
+This project was built with the assistance of AI tools including ChatGPT, Claude, and Cursor.
+The software is for educational and training purposes only.
+No guarantee of accuracy is provided. Use at your own risk.
