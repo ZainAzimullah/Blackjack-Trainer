@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "blackjack",
+      "runtimeExecutable": "ruby",
+      "runtimeArgs": ["/tmp/blackjack/server.rb"],
+      "port": 8090
+    }
+  ]
+}

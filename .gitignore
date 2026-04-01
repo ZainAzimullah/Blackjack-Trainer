@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Python cache/artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Ruby artifacts
+*.gem
+.bundle/
+
+# Logs and runtime temp files
+*.log
+*.tmp
+*.swp
+
+# Editor/IDE settings
+.idea/
+.vscode/
+
+# Cursor local state (if created)
+.cursor/
+
+# Claude local-only settings (keep shared config like .claude/launch.json tracked)
+.claude/settings.local.json
