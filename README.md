@@ -47,3 +47,7 @@ Then open:
 - `serve.py` - simple local static server (port 8090)
 - `server.rb` - alternate simple server script
 - `Play Blackjack.command` - launcher script for macOS
+
+## Notes
+
+This project was vibe coded with Claude Code and Cursor. ChatGPT was used to generate the initial `CLAUDE.md` rules file.
