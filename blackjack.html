@@ -679,6 +679,7 @@ body {
   </div>
 
   <div id="options-bar">
+    <button class="option-btn active" id="btn-toggle-sound">Sound: ON</button>
     <button class="option-btn" id="btn-toggle-feedback">Strategy Hints: OFF</button>
     <button class="option-btn" id="btn-show-chart">Strategy Chart (S)</button>
   </div>
@@ -828,6 +829,54 @@ let currentHandIndex = 0;
 let gamePhase = 'BETTING'; // BETTING, PLAYER_TURN, DEALER_TURN, ROUND_OVER
 let showStrategyFeedback = false;
 let feedbackTimeout = null;
+let soundEnabled = true;
+let audioCtx = null;
+
+function ensureAudioContext() {
+  if (!soundEnabled) return null;
+  if (!audioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return null;
+    audioCtx = new AudioContextClass();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+  return audioCtx;
+}
+
+function playTone({ freq = 440, type = 'sine', duration = 0.08, volume = 0.05, slideTo = null }) {
+  const ctx = ensureAudioContext();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, now);
+  if (slideTo) {
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, slideTo), now + duration);
+  }
+
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(volume, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + duration + 0.01);
+}
+
+function playCardSound() {
+  playTone({ freq: 520, type: 'triangle', duration: 0.07, volume: 0.035, slideTo: 300 });
+}
+
+function playChipSound(chipValue = 25) {
+  const base = chipValue >= 500 ? 220 : chipValue >= 100 ? 260 : chipValue >= 25 ? 320 : 380;
+  playTone({ freq: base, type: 'square', duration: 0.045, volume: 0.03, slideTo: base * 0.9 });
+  setTimeout(() => playTone({ freq: base * 1.3, type: 'triangle', duration: 0.04, volume: 0.022 }), 30);
+}
 
 // ============================================================
 // SHOE MANAGEMENT
@@ -1165,14 +1214,17 @@ async function deal() {
   // Animate dealing
   playerHands[0].cards.push(p1);
   renderPlayerHands();
+  playCardSound();
   await delay(DEAL_DELAY);
 
   dealerCards.push(d1);
   renderDealerCards();
+  playCardSound();
   await delay(DEAL_DELAY);
 
   playerHands[0].cards.push(p2);
   renderPlayerHands();
+  playCardSound();
   await delay(DEAL_DELAY);
 
   gamePhase = 'PLAYER_TURN';
@@ -1204,6 +1256,7 @@ async function playerHit() {
 
   hand.cards.push(drawCard());
   renderPlayerHands();
+  playCardSound();
 
   if (handTotal(hand.cards) >= 21) {
     hand.isComplete = true;
@@ -1242,9 +1295,11 @@ async function playerDouble() {
   hand.bet += hand.originalBet;
   hand.isDoubled = true;
   updateBankrollDisplay();
+  playChipSound(hand.originalBet);
 
   hand.cards.push(drawCard());
   renderPlayerHands();
+  playCardSound();
 
   hand.isComplete = true;
   await advanceHand();
@@ -1267,6 +1322,7 @@ async function playerSplit() {
   // Deduct additional bet
   bankroll -= hand.originalBet;
   updateBankrollDisplay();
+  playChipSound(hand.originalBet);
 
   const card1 = hand.cards[0];
   const card2 = hand.cards[1];
@@ -1300,10 +1356,12 @@ async function playerSplit() {
   // Deal one card to each
   hand1.cards.push(drawCard());
   renderPlayerHands();
+  playCardSound();
   await delay(DEAL_DELAY);
 
   hand2.cards.push(drawCard());
   renderPlayerHands();
+  playCardSound();
   await delay(DEAL_DELAY);
 
   // Split aces: one card each, complete
@@ -1378,6 +1436,7 @@ async function dealerPlay() {
 
       dealerCards.push(drawCard());
       renderDealerCards();
+      playCardSound();
       await delay(DEAL_DELAY + 100);
     }
   }
@@ -1571,6 +1630,7 @@ function init() {
       if (currentBet + val <= bankroll) {
         currentBet += val;
         updateBetDisplay();
+        playChipSound(val);
       }
     });
   });
@@ -1604,6 +1664,17 @@ function init() {
     btn.classList.toggle('active', showStrategyFeedback);
   });
 
+  document.getElementById('btn-toggle-sound').addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    const btn = document.getElementById('btn-toggle-sound');
+    btn.textContent = 'Sound: ' + (soundEnabled ? 'ON' : 'OFF');
+    btn.classList.toggle('active', soundEnabled);
+    if (soundEnabled) {
+      ensureAudioContext();
+      playTone({ freq: 420, type: 'triangle', duration: 0.05, volume: 0.02 });
+    }
+  });
+
   // Strategy chart toggle
   document.getElementById('btn-show-chart').addEventListener('click', toggleChart);
   document.getElementById('close-chart').addEventListener('click', toggleChart);
@@ -1634,10 +1705,10 @@ function init() {
         e.preventDefault();
         if (currentBet >= MIN_BET) deal();
       }
-      if (e.key === '1') { currentBet += 5; if (currentBet > bankroll) currentBet = bankroll; updateBetDisplay(); }
-      if (e.key === '2') { currentBet += 25; if (currentBet > bankroll) currentBet = bankroll; updateBetDisplay(); }
-      if (e.key === '3') { currentBet += 100; if (currentBet > bankroll) currentBet = bankroll; updateBetDisplay(); }
-      if (e.key === '4') { currentBet += 500; if (currentBet > bankroll) currentBet = bankroll; updateBetDisplay(); }
+      if (e.key === '1') { currentBet += 5; if (currentBet > bankroll) currentBet = bankroll; updateBetDisplay(); playChipSound(5); }
+      if (e.key === '2') { currentBet += 25; if (currentBet > bankroll) currentBet = bankroll; updateBetDisplay(); playChipSound(25); }
+      if (e.key === '3') { currentBet += 100; if (currentBet > bankroll) currentBet = bankroll; updateBetDisplay(); playChipSound(100); }
+      if (e.key === '4') { currentBet += 500; if (currentBet > bankroll) currentBet = bankroll; updateBetDisplay(); playChipSound(500); }
     }
 
     if (gamePhase === 'ROUND_OVER') {
