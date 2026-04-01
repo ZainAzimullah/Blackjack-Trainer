@@ -857,6 +857,7 @@ let feedbackTimeout = null;
 let soundEnabled = true;
 let soundVolume = 0.65;
 let audioCtx = null;
+let noiseBuffer = null;
 
 function ensureAudioContext() {
   if (!soundEnabled) return null;
@@ -895,14 +896,59 @@ function playTone({ freq = 440, type = 'sine', duration = 0.08, volume = 0.05, s
   osc.stop(now + duration + 0.01);
 }
 
+function getNoiseBuffer(ctx) {
+  if (noiseBuffer && noiseBuffer.sampleRate === ctx.sampleRate) return noiseBuffer;
+  const length = ctx.sampleRate;
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) {
+    data[i] = Math.random() * 2 - 1;
+  }
+  noiseBuffer = buffer;
+  return noiseBuffer;
+}
+
+function playNoiseBurst({ duration = 0.08, volume = 0.02, filterType = 'bandpass', freq = 900, q = 0.7, when = 0 }) {
+  const ctx = ensureAudioContext();
+  if (!ctx) return;
+  const now = ctx.currentTime + when;
+  const src = ctx.createBufferSource();
+  const filter = ctx.createBiquadFilter();
+  const gain = ctx.createGain();
+  const adjustedVolume = Math.max(0.0001, volume * soundVolume);
+
+  src.buffer = getNoiseBuffer(ctx);
+  filter.type = filterType;
+  filter.frequency.setValueAtTime(freq, now);
+  filter.Q.setValueAtTime(q, now);
+
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(adjustedVolume, now + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+  src.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+  src.start(now);
+  src.stop(now + duration + 0.01);
+}
+
 function playCardSound() {
-  playTone({ freq: 520, type: 'triangle', duration: 0.07, volume: 0.035, slideTo: 300 });
+  // Short papery "thup": filtered noise + tiny low thud
+  playNoiseBurst({ duration: 0.055, volume: 0.016, filterType: 'bandpass', freq: 1450, q: 1.1 });
+  playNoiseBurst({ duration: 0.085, volume: 0.010, filterType: 'highpass', freq: 620, q: 0.6, when: 0.01 });
+  playTone({ freq: 130, type: 'sine', duration: 0.045, volume: 0.008, slideTo: 105 });
 }
 
 function playChipSound(chipValue = 25) {
-  const base = chipValue >= 500 ? 220 : chipValue >= 100 ? 260 : chipValue >= 25 ? 320 : 380;
-  playTone({ freq: base, type: 'square', duration: 0.045, volume: 0.03, slideTo: base * 0.9 });
-  setTimeout(() => playTone({ freq: base * 1.3, type: 'triangle', duration: 0.04, volume: 0.022 }), 30);
+  // Clay chip "clack": bright transient + brief metallic click
+  const weight = chipValue >= 500 ? 1.2 : chipValue >= 100 ? 1.0 : chipValue >= 25 ? 0.9 : 0.8;
+  playNoiseBurst({ duration: 0.03, volume: 0.02 * weight, filterType: 'bandpass', freq: 2300, q: 3.2 });
+  playTone({ freq: 980, type: 'triangle', duration: 0.028, volume: 0.012 * weight, slideTo: 760 });
+  setTimeout(() => {
+    playNoiseBurst({ duration: 0.032, volume: 0.013 * weight, filterType: 'bandpass', freq: 1800, q: 2.3 });
+    playTone({ freq: 720, type: 'triangle', duration: 0.025, volume: 0.009 * weight, slideTo: 560 });
+  }, 22);
 }
 
 function playUiClickSound() {
