@@ -1,0 +1,11 @@
+Casino table foley (card placement and chip lay sounds):
+
+Kenney Casino Audio
+https://opengameart.org/content/54-casino-sound-effects-cards-dice-chips
+License: CC0 (public domain) — https://creativecommons.org/publicdomain/zero/1.0/
+
+Files used:
+- card-place-1.ogg through card-place-4.ogg
+- chip-lay-1.ogg through chip-lay-3.ogg
+
+If samples fail to load in the browser, the game falls back to synthesized sounds.

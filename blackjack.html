@@ -964,55 +964,189 @@ const MIN_BET = 5;
 const DEAL_DELAY = 250;
 
 // ============================================================
-// BASIC STRATEGY TABLES
+// BASIC STRATEGY TABLES (loaded from basic_strategy_enhc_obbo_h17_das.csv)
 // Indices: dealer upcard (2-11, where 11=Ace)
-// ENHC + OBBO + H17 + DAS + No Soft Double + 6 Decks
+// CSV: H/S/Dh for hard & soft; Y/N for pairs (split / do not split)
 // ============================================================
 
-// Hard totals: [playerTotal][dealerUpcard] = 'H'|'S'|'D'
-const HARD = {};
-for (let t = 4; t <= 8; t++) {
-  HARD[t] = {};
-  for (let d = 2; d <= 11; d++) HARD[t][d] = 'H';
-}
-HARD[9] = { 2:'H', 3:'D', 4:'D', 5:'D', 6:'D', 7:'H', 8:'H', 9:'H', 10:'H', 11:'H' };
-HARD[10] = { 2:'D', 3:'D', 4:'D', 5:'D', 6:'D', 7:'D', 8:'D', 9:'D', 10:'H', 11:'H' };
-HARD[11] = { 2:'D', 3:'D', 4:'D', 5:'D', 6:'D', 7:'D', 8:'D', 9:'D', 10:'D', 11:'H' };
-HARD[12] = { 2:'H', 3:'H', 4:'S', 5:'S', 6:'S', 7:'H', 8:'H', 9:'H', 10:'H', 11:'H' };
-for (let t = 13; t <= 16; t++) {
-  HARD[t] = { 2:'S', 3:'S', 4:'S', 5:'S', 6:'S', 7:'H', 8:'H', 9:'H', 10:'H', 11:'H' };
-}
-for (let t = 17; t <= 21; t++) {
-  HARD[t] = {};
-  for (let d = 2; d <= 11; d++) HARD[t][d] = 'S';
+const STRATEGY_CSV_URL = 'basic_strategy_enhc_obbo_h17_das.csv';
+const DEALER_UPCARDS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+let HARD = {};
+let SOFT = {};
+let PAIRS = {};
+let strategyChartOrder = { hard: [], soft: [], pair: [] };
+
+const EMBEDDED_STRATEGY_CSV = `section,hand,2,3,4,5,6,7,8,9,10,A
+hard,20,S,S,S,S,S,S,S,S,S,S
+hard,19,S,S,S,S,S,S,S,S,S,S
+hard,18,S,S,S,S,S,S,S,S,S,S
+hard,17,S,S,S,S,S,S,S,S,S,S
+hard,16,S,S,S,S,S,H,H,H,H,H
+hard,15,S,S,S,S,S,H,H,H,H,H
+hard,14,S,S,S,S,S,H,H,H,H,H
+hard,13,S,S,S,S,S,H,H,H,H,H
+hard,12,H,H,S,S,S,H,H,H,H,H
+hard,11,Dh,Dh,Dh,Dh,Dh,Dh,Dh,Dh,Dh,Dh
+hard,10,Dh,Dh,Dh,Dh,Dh,Dh,Dh,Dh,H,H
+hard,9,H,Dh,Dh,Dh,Dh,H,H,H,H,H
+hard,8,H,H,H,H,H,H,H,H,H,H
+hard,7,H,H,H,H,H,H,H,H,H,H
+hard,6,H,H,H,H,H,H,H,H,H,H
+hard,5,H,H,H,H,H,H,H,H,H,H
+
+pair,"A,A",Y,Y,Y,Y,Y,Y,Y,Y,Y,Y
+pair,"10,10",N,N,N,N,N,N,N,N,N,N
+pair,"9,9",Y,Y,Y,Y,Y,N,Y,Y,N,N
+pair,"8,8",Y,Y,Y,Y,Y,Y,Y,Y,Y,Y
+pair,"7,7",Y,Y,Y,Y,Y,Y,N,N,N,N
+pair,"6,6",Y,Y,Y,Y,Y,N,N,N,N,N
+pair,"5,5",N,N,N,N,N,N,N,N,N,N
+pair,"4,4",N,N,N,Y,Y,N,N,N,N,N
+pair,"3,3",Y,Y,Y,Y,Y,Y,N,N,N,N
+pair,"2,2",Y,Y,Y,Y,Y,Y,N,N,N,N
+
+soft,"A,9",S,S,S,S,S,S,S,S,S,S
+soft,"A,8",S,S,S,S,S,S,S,S,S,S
+soft,"A,7",S,S,S,S,S,S,S,H,H,H
+soft,"A,6",H,H,H,H,H,H,H,H,H,H
+soft,"A,5",H,H,H,H,H,H,H,H,H,H
+soft,"A,4",H,H,H,H,H,H,H,H,H,H
+soft,"A,3",H,H,H,H,H,H,H,H,H,H
+soft,"A,2",H,H,H,H,H,H,H,H,H,H
+`;
+
+function parseCsvRows(text) {
+  const lines = text.trim().split(/\r?\n/).filter(l => l.length);
+  return lines.map(line => {
+    const cells = [];
+    let cur = '';
+    let q = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { q = !q; continue; }
+      if (!q && c === ',') { cells.push(cur); cur = ''; continue; }
+      cur += c;
+    }
+    cells.push(cur);
+    return cells;
+  });
 }
 
-// Soft totals (no doubling allowed): [softTotal][dealerUpcard] = 'H'|'S'
-// softTotal = total with Ace counted as 11 (13=A+2, 14=A+3, ..., 20=A+9, 21=A+10)
-const SOFT = {};
-for (let t = 13; t <= 17; t++) {
-  SOFT[t] = {};
-  for (let d = 2; d <= 11; d++) SOFT[t][d] = 'H';
-}
-SOFT[18] = { 2:'S', 3:'S', 4:'S', 5:'S', 6:'S', 7:'S', 8:'S', 9:'H', 10:'H', 11:'H' };
-for (let t = 19; t <= 21; t++) {
-  SOFT[t] = {};
-  for (let d = 2; d <= 11; d++) SOFT[t][d] = 'S';
+function mapHardSoftCell(raw) {
+  const u = String(raw).trim().toUpperCase();
+  if (u === 'DH' || u === 'D') return 'D';
+  if (u === 'H') return 'H';
+  if (u === 'S') return 'S';
+  return 'S';
 }
 
-// Pairs: [pairRankValue][dealerUpcard] = 'P' or null (meaning don't split)
-// pairRankValue: 2-10 (face cards = 10), 11 = Aces
-const PAIRS = {};
-PAIRS[2]  = { 2:'P', 3:'P', 4:'P', 5:'P', 6:'P', 7:'P', 8:null, 9:null, 10:null, 11:null };
-PAIRS[3]  = { 2:'P', 3:'P', 4:'P', 5:'P', 6:'P', 7:'P', 8:null, 9:null, 10:null, 11:null };
-PAIRS[4]  = { 2:null, 3:null, 4:null, 5:'P', 6:'P', 7:null, 8:null, 9:null, 10:null, 11:null };
-PAIRS[5]  = { 2:null, 3:null, 4:null, 5:null, 6:null, 7:null, 8:null, 9:null, 10:null, 11:null }; // never split 5s
-PAIRS[6]  = { 2:'P', 3:'P', 4:'P', 5:'P', 6:'P', 7:null, 8:null, 9:null, 10:null, 11:null };
-PAIRS[7]  = { 2:'P', 3:'P', 4:'P', 5:'P', 6:'P', 7:'P', 8:null, 9:null, 10:null, 11:null };
-PAIRS[8]  = { 2:'P', 3:'P', 4:'P', 5:'P', 6:'P', 7:'P', 8:'P', 9:'P', 10:'P', 11:null };
-PAIRS[9]  = { 2:'P', 3:'P', 4:'P', 5:'P', 6:'P', 7:null, 8:'P', 9:'P', 10:null, 11:null };
-PAIRS[10] = { 2:null, 3:null, 4:null, 5:null, 6:null, 7:null, 8:null, 9:null, 10:null, 11:null }; // never split 10s
-PAIRS[11] = { 2:'P', 3:'P', 4:'P', 5:'P', 6:'P', 7:'P', 8:'P', 9:'P', 10:'P', 11:null }; // don't split aces vs dealer Ace
+function mapPairCell(raw) {
+  const u = String(raw).trim().toUpperCase();
+  if (u === 'Y' || u === 'P') return 'P';
+  return null;
+}
+
+function softTotalFromHandLabel(hand) {
+  const h = hand.replace(/^"|"$/g, '').trim();
+  const m = h.match(/^A,(\d+)$/);
+  if (!m) return null;
+  return 11 + parseInt(m[1], 10);
+}
+
+function pairRankFromHandLabel(hand) {
+  const h = hand.replace(/^"|"$/g, '').trim();
+  if (h === 'A,A') return 11;
+  const parts = h.split(',');
+  if (parts.length !== 2) return null;
+  if (parts[0] === '10' && parts[1] === '10') return 10;
+  return parseInt(parts[0], 10);
+}
+
+function fillStrategyGaps() {
+  const fillRow = (val) => {
+    const o = {};
+    for (const d of DEALER_UPCARDS) o[d] = val;
+    return o;
+  };
+  const fillHard = (t) => {
+    const row = fillRow('H');
+    if (t >= 17) for (const d of DEALER_UPCARDS) row[d] = 'S';
+    return row;
+  };
+  for (let t = 4; t <= 21; t++) {
+    if (!HARD[t]) HARD[t] = fillHard(t);
+  }
+  for (let t = 13; t <= 21; t++) {
+    if (!SOFT[t]) {
+      SOFT[t] = {};
+      for (const d of DEALER_UPCARDS) SOFT[t][d] = t >= 19 ? 'S' : 'H';
+    }
+  }
+  for (let pv = 2; pv <= 11; pv++) {
+    if (!PAIRS[pv]) {
+      PAIRS[pv] = {};
+      for (const d of DEALER_UPCARDS) PAIRS[pv][d] = null;
+    }
+  }
+}
+
+function parseStrategyCsv(text) {
+  HARD = {};
+  SOFT = {};
+  PAIRS = {};
+  strategyChartOrder = { hard: [], soft: [], pair: [] };
+
+  const rows = parseCsvRows(text);
+  if (rows.length < 2) return;
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (row.length < 12) continue;
+    const section = row[0].trim().toLowerCase();
+    const hand = row[1].trim();
+    const cells = row.slice(2, 12).map(c => c.trim());
+
+    if (section === 'hard') {
+      const total = parseInt(hand, 10);
+      if (Number.isNaN(total)) continue;
+      HARD[total] = {};
+      cells.forEach((cell, j) => {
+        HARD[total][DEALER_UPCARDS[j]] = mapHardSoftCell(cell);
+      });
+      strategyChartOrder.hard.push({ label: String(total), total });
+    } else if (section === 'soft') {
+      const st = softTotalFromHandLabel(hand);
+      if (st == null) continue;
+      SOFT[st] = {};
+      cells.forEach((cell, j) => {
+        SOFT[st][DEALER_UPCARDS[j]] = mapHardSoftCell(cell);
+      });
+      const label = hand.replace(/^"|"$/g, '');
+      strategyChartOrder.soft.push({ label, softTotal: st });
+    } else if (section === 'pair') {
+      const pv = pairRankFromHandLabel(hand);
+      if (pv == null) continue;
+      PAIRS[pv] = {};
+      cells.forEach((cell, j) => {
+        const v = mapPairCell(cell);
+        PAIRS[pv][DEALER_UPCARDS[j]] = v;
+      });
+      const label = hand.replace(/^"|"$/g, '');
+      strategyChartOrder.pair.push({ label, pairVal: pv });
+    }
+  }
+}
+
+async function loadStrategyFromCsv() {
+  let text = EMBEDDED_STRATEGY_CSV;
+  try {
+    const res = await fetch(STRATEGY_CSV_URL, { cache: 'no-store' });
+    if (res.ok) text = await res.text();
+  } catch (e) { /* use embedded */ }
+  parseStrategyCsv(text);
+  fillStrategyGaps();
+}
 
 // ============================================================
 // GAME STATE
@@ -1032,6 +1166,21 @@ let soundVolume = 0.65;
 let audioCtx = null;
 let noiseBuffer = null;
 let dealerSpeechTimeout = null;
+
+const FOLEY_CARD_URLS = [
+  'assets/sounds/card-place-1.ogg',
+  'assets/sounds/card-place-2.ogg',
+  'assets/sounds/card-place-3.ogg',
+  'assets/sounds/card-place-4.ogg'
+];
+const FOLEY_CHIP_URLS = [
+  'assets/sounds/chip-lay-1.ogg',
+  'assets/sounds/chip-lay-2.ogg',
+  'assets/sounds/chip-lay-3.ogg'
+];
+let foleyCardBuffers = [];
+let foleyChipBuffers = [];
+let foleySamplesReady = false;
 
 function ensureAudioContext() {
   if (!soundEnabled) return null;
@@ -1097,7 +1246,7 @@ function playNoiseBurst({ duration = 0.08, volume = 0.02, filterType = 'bandpass
   filter.Q.setValueAtTime(q, now);
 
   gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(adjustedVolume, now + 0.006);
+  gain.gain.exponentialRampToValueAtTime(adjustedVolume, now + 0.004);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
   src.connect(filter);
@@ -1107,42 +1256,172 @@ function playNoiseBurst({ duration = 0.08, volume = 0.02, filterType = 'bandpass
   src.stop(now + duration + 0.01);
 }
 
+async function loadFoleySamples() {
+  const ctx = ensureAudioContext();
+  if (!ctx) return;
+  foleySamplesReady = false;
+  foleyCardBuffers = [];
+  foleyChipBuffers = [];
+  const decodeUrl = async (url) => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(url);
+    const ab = await res.arrayBuffer();
+    return ctx.decodeAudioData(ab.slice(0));
+  };
+  try {
+    foleyCardBuffers = await Promise.all(FOLEY_CARD_URLS.map(decodeUrl));
+    foleyChipBuffers = await Promise.all(FOLEY_CHIP_URLS.map(decodeUrl));
+    foleySamplesReady = foleyCardBuffers.length > 0 && foleyChipBuffers.length > 0;
+  } catch (e) {
+    foleySamplesReady = false;
+  }
+}
+
+function playFoleyBuffer(buffer, gainMul = 0.85) {
+  const ctx = ensureAudioContext();
+  if (!ctx || !buffer || !soundEnabled) return;
+  const src = ctx.createBufferSource();
+  const gain = ctx.createGain();
+  src.buffer = buffer;
+  gain.gain.setValueAtTime(Math.max(0.0001, gainMul * soundVolume), ctx.currentTime);
+  src.connect(gain);
+  gain.connect(ctx.destination);
+  src.start(0);
+}
+
+function playCardSoundProcedural() {
+  const j = () => (Math.random() - 0.5) * 0.25;
+  playNoiseBurst({
+    duration: 0.042 + j() * 0.012,
+    volume: 0.007,
+    filterType: 'bandpass',
+    freq: 1550 + j() * 180,
+    q: 2.4 + Math.random() * 0.6,
+    when: 0
+  });
+  playNoiseBurst({
+    duration: 0.028,
+    volume: 0.0038,
+    filterType: 'highpass',
+    freq: 3200 + j() * 400,
+    q: 0.55,
+    when: 0.0015
+  });
+  playTone({
+    freq: 92 + Math.random() * 18,
+    type: 'sine',
+    duration: 0.038,
+    volume: 0.005,
+    slideTo: 68
+  });
+}
+
 function playCardSound() {
-  // Short papery "thup": filtered noise + tiny low thud
-  playNoiseBurst({ duration: 0.055, volume: 0.016, filterType: 'bandpass', freq: 1450, q: 1.1 });
-  playNoiseBurst({ duration: 0.085, volume: 0.010, filterType: 'highpass', freq: 620, q: 0.6, when: 0.01 });
-  playTone({ freq: 130, type: 'sine', duration: 0.045, volume: 0.008, slideTo: 105 });
+  if (foleySamplesReady && foleyCardBuffers.length) {
+    const buf = foleyCardBuffers[Math.floor(Math.random() * foleyCardBuffers.length)];
+    playFoleyBuffer(buf, 0.88);
+    return;
+  }
+  playCardSoundProcedural();
+}
+
+function playChipSoundProcedural(chipValue = 25) {
+  const w =
+    chipValue >= 500 ? 1.12 : chipValue >= 100 ? 1.0 : chipValue >= 25 ? 0.93 : 0.86;
+  const base =
+    chipValue >= 500 ? 1050 : chipValue >= 100 ? 1180 : chipValue >= 25 ? 1320 : 1480;
+  const j = (Math.random() - 0.5) * 60;
+
+  playNoiseBurst({
+    duration: 0.032,
+    volume: 0.011 * w,
+    filterType: 'bandpass',
+    freq: base + j,
+    q: 4.2
+  });
+  playNoiseBurst({
+    duration: 0.022,
+    volume: 0.006 * w,
+    filterType: 'bandpass',
+    freq: base * 1.55 + j,
+    q: 3.0,
+    when: 0.002
+  });
+  playTone({
+    freq: base * 1.08 + j * 0.5,
+    type: 'triangle',
+    duration: 0.042,
+    volume: 0.0075 * w,
+    slideTo: base * 0.72
+  });
+  setTimeout(() => {
+    playNoiseBurst({
+      duration: 0.026,
+      volume: 0.0065 * w,
+      filterType: 'bandpass',
+      freq: base * 0.82 + j * 0.4,
+      q: 2.6
+    });
+    playTone({
+      freq: base * 0.48 + j * 0.3,
+      type: 'sine',
+      duration: 0.048,
+      volume: 0.005 * w,
+      slideTo: base * 0.32
+    });
+  }, 16 + Math.random() * 10);
 }
 
 function playChipSound(chipValue = 25) {
-  // Clay chip "clack": bright transient + brief metallic click
-  const weight = chipValue >= 500 ? 1.2 : chipValue >= 100 ? 1.0 : chipValue >= 25 ? 0.9 : 0.8;
-  playNoiseBurst({ duration: 0.03, volume: 0.02 * weight, filterType: 'bandpass', freq: 2300, q: 3.2 });
-  playTone({ freq: 980, type: 'triangle', duration: 0.028, volume: 0.012 * weight, slideTo: 760 });
-  setTimeout(() => {
-    playNoiseBurst({ duration: 0.032, volume: 0.013 * weight, filterType: 'bandpass', freq: 1800, q: 2.3 });
-    playTone({ freq: 720, type: 'triangle', duration: 0.025, volume: 0.009 * weight, slideTo: 560 });
-  }, 22);
+  if (foleySamplesReady && foleyChipBuffers.length) {
+    let idx = 0;
+    if (chipValue >= 500) idx = 2;
+    else if (chipValue >= 100) idx = 2;
+    else if (chipValue >= 25) idx = 1;
+    idx = Math.min(idx, foleyChipBuffers.length - 1);
+    playFoleyBuffer(foleyChipBuffers[idx], 0.92);
+    return;
+  }
+  playChipSoundProcedural(chipValue);
 }
 
 function playUiClickSound() {
   playTone({ freq: 620, type: 'triangle', duration: 0.03, volume: 0.016, slideTo: 520 });
 }
 
+function outcomeSoundFromResults(results) {
+  if (!results || results.length === 0) return 'lose';
+  if (results.length === 1) {
+    const r = results[0];
+    if (r === 'blackjack' || r === 'win' || r === 'lose' || r === 'push') return r;
+    return 'lose';
+  }
+  const wins = results.filter(r => r === 'win' || r === 'blackjack').length;
+  const losses = results.filter(r => r === 'lose').length;
+  const pushes = results.filter(r => r === 'push').length;
+  if (wins > 0 && losses === 0) return 'win';
+  if (wins === 0 && losses > 0 && pushes === 0) return 'lose';
+  return 'push';
+}
+
 function playOutcomeSound(kind) {
+  if (!kind || !soundEnabled) return;
+  const beep = (freq, type = 'triangle', duration = 0.07, volume = 0.038) => {
+    playTone({ freq, type, duration, volume, slideTo: null });
+  };
   if (kind === 'blackjack') {
-    playTone({ freq: 520, type: 'triangle', duration: 0.09, volume: 0.03 });
-    setTimeout(() => playTone({ freq: 780, type: 'triangle', duration: 0.11, volume: 0.032 }), 80);
-    setTimeout(() => playTone({ freq: 1040, type: 'sine', duration: 0.12, volume: 0.03 }), 170);
+    beep(660, 'square', 0.06, 0.034);
+    setTimeout(() => beep(880, 'square', 0.07, 0.034), 85);
+    setTimeout(() => beep(990, 'triangle', 0.08, 0.032), 175);
   } else if (kind === 'win') {
-    playTone({ freq: 520, type: 'triangle', duration: 0.08, volume: 0.026 });
-    setTimeout(() => playTone({ freq: 700, type: 'triangle', duration: 0.09, volume: 0.026 }), 90);
+    beep(587, 'square', 0.065, 0.036);
+    setTimeout(() => beep(784, 'square', 0.075, 0.034), 90);
   } else if (kind === 'push') {
-    playTone({ freq: 430, type: 'sine', duration: 0.07, volume: 0.02 });
-    setTimeout(() => playTone({ freq: 430, type: 'sine', duration: 0.06, volume: 0.017 }), 85);
+    beep(440, 'sine', 0.08, 0.028);
+    setTimeout(() => beep(440, 'sine', 0.07, 0.024), 95);
   } else if (kind === 'lose') {
-    playTone({ freq: 340, type: 'sawtooth', duration: 0.08, volume: 0.02, slideTo: 220 });
-    setTimeout(() => playTone({ freq: 240, type: 'triangle', duration: 0.1, volume: 0.018, slideTo: 170 }), 95);
+    beep(200, 'square', 0.11, 0.036);
+    setTimeout(() => beep(165, 'triangle', 0.12, 0.028), 100);
   }
 }
 
@@ -1746,7 +2025,6 @@ function resolveRound() {
   const dealerBust = dealerTotal > 21;
 
   let totalPayout = 0;
-  let outcomeForSound = null;
 
   if (dealerBJ) {
     // OBBO: only original bet is lost. Additional bets (doubles, splits) push.
@@ -1758,7 +2036,6 @@ function resolveRound() {
       // Push - return original bet
       playerHands[0].result = 'push';
       totalPayout = roundOriginalBet;
-      outcomeForSound = 'push';
     } else {
       // OBBO: lose original bet, return everything else
       let totalWagered = 0;
@@ -1770,7 +2047,6 @@ function resolveRound() {
       for (const h of playerHands) {
         h.result = 'lose';
       }
-      outcomeForSound = 'lose';
     }
 
     setMessage(playerHands[0].result === 'push' ? 'Push - Both Blackjack' : 'Dealer Blackjack - OBBO');
@@ -1807,7 +2083,6 @@ function resolveRound() {
       else if (r === 'win') setMessage('You win!');
       else if (r === 'lose') setMessage(handTotal(playerHands[0].cards) > 21 ? 'Bust!' : 'Dealer wins');
       else if (r === 'push') setMessage('Push');
-      outcomeForSound = r;
       if (r === 'blackjack') setDealerSpeech('Blackjack! Nice hand.', 'happy', 2200);
       else if (r === 'win') setDealerSpeech('You got it. Nice win.', 'neutral', 2000);
       else if (r === 'lose') setDealerSpeech('Dealer takes it.', 'tense', 1800);
@@ -1821,9 +2096,6 @@ function resolveRound() {
       if (losses > 0) parts.push(losses + ' loss' + (losses > 1 ? 'es' : ''));
       if (pushes > 0) parts.push(pushes + ' push' + (pushes > 1 ? 'es' : ''));
       setMessage(parts.join(', '));
-      if (wins > 0 && losses === 0) outcomeForSound = 'win';
-      else if (wins === 0 && losses > 0 && pushes === 0) outcomeForSound = 'lose';
-      else outcomeForSound = 'push';
       if (wins > losses) setDealerSpeech('Strong round for you.', 'neutral', 2000);
       else if (losses > wins) setDealerSpeech('Dealer side won that one.', 'tense', 2000);
       else setDealerSpeech('Mixed result. New hand?', 'neutral', 1900);
@@ -1834,7 +2106,8 @@ function resolveRound() {
   updateBankrollDisplay();
   renderPlayerHands();
   renderDealerCards();
-  playOutcomeSound(outcomeForSound);
+  const outcomeKind = outcomeSoundFromResults(playerHands.map(h => h.result));
+  setTimeout(() => playOutcomeSound(outcomeKind), 120);
 
   document.getElementById('new-round-area').classList.add('visible');
 
@@ -1874,48 +2147,30 @@ function buildStrategyChart() {
     return html;
   }
 
-  // Hard totals
-  const hardRows = [];
-  for (let t = 8; t <= 17; t++) {
-    const label = t === 17 ? '17+' : '' + t;
-    const actions = dealerVals.map(d => {
-      if (t >= 17) return HARD[17][d];
-      return HARD[t][d];
-    });
-    hardRows.push({ label, actions });
-  }
+  const hardRows = strategyChartOrder.hard.map(({ label, total }) => ({
+    label,
+    actions: dealerVals.map(d => (HARD[total] && HARD[total][d] != null) ? HARD[total][d] : 'S')
+  }));
 
-  // Soft totals
-  const softRows = [];
-  for (let t = 13; t <= 20; t++) {
-    const label = 'A,' + (t - 11);
-    const actions = dealerVals.map(d => SOFT[t] ? SOFT[t][d] : 'S');
-    softRows.push({ label, actions });
-  }
+  const softRows = strategyChartOrder.soft.map(({ label, softTotal }) => ({
+    label,
+    actions: dealerVals.map(d => SOFT[softTotal] ? SOFT[softTotal][d] : 'S')
+  }));
 
-  // Pairs
-  const pairLabels = [
-    { val: 11, label: 'A,A' },
-    { val: 10, label: '10,10' },
-    { val: 9, label: '9,9' },
-    { val: 8, label: '8,8' },
-    { val: 7, label: '7,7' },
-    { val: 6, label: '6,6' },
-    { val: 5, label: '5,5' },
-    { val: 4, label: '4,4' },
-    { val: 3, label: '3,3' },
-    { val: 2, label: '2,2' },
-  ];
-  const pairRows = pairLabels.map(p => {
+  const pairRows = strategyChartOrder.pair.map(p => {
     const actions = dealerVals.map(d => {
-      if (PAIRS[p.val][d] === 'P') return 'P';
-      // Fall through to hard strategy
-      const hardTotal = p.val === 11 ? 12 : p.val * 2; // A,A without split = hard 12
+      if (PAIRS[p.pairVal][d] === 'P') return 'P';
+      const hardTotal = p.pairVal === 11 ? 12 : p.pairVal * 2;
       const clamped = Math.min(Math.max(hardTotal, 4), 21);
       return HARD[clamped] ? HARD[clamped][d] : 'S';
     });
     return { label: p.label, actions };
   });
+
+  if (!hardRows.length && !softRows.length && !pairRows.length) {
+    container.innerHTML = '<p style="color:#ccc;text-align:center;">Strategy chart could not be loaded.</p>';
+    return;
+  }
 
   container.innerHTML =
     makeTable('Hard Totals', hardRows) +
@@ -1926,11 +2181,19 @@ function buildStrategyChart() {
 // ============================================================
 // EVENT HANDLERS
 // ============================================================
-function init() {
+async function init() {
+  await loadStrategyFromCsv();
+  await loadFoleySamples();
   createShoe();
   buildStrategyChart();
   updateBankrollDisplay();
   startNewRound();
+
+  function sendServerPing() {
+    fetch('/__ping', { method: 'GET', cache: 'no-store' }).catch(() => {});
+  }
+  sendServerPing();
+  setInterval(sendServerPing, 4000);
 
   // Chip clicks
   document.querySelectorAll('.chip').forEach(chip => {
@@ -2054,7 +2317,7 @@ function toggleChart() {
 }
 
 // Start
-init();
+init().catch(() => {});
 </script>
 </body>
 </html>

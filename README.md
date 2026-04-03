@@ -37,6 +37,10 @@ Then open:
 
 `http://127.0.0.1:8090/blackjack.html`
 
+On macOS you can double-click **`Play Blackjack.command`**, which starts that server (if it is not already running) and opens the same URL. Do not open `blackjack.html` directly from the Finder, or `fetch` will not load the CSV and sounds.
+
+While the game tab is open, the page pings the server every few seconds. About **5 seconds** after you close the tab (or stop pings), the server exits so it is not left running in the background.
+
 ## Screenshots
 
 ![Gameplay screenshot](assets/gameplay-1.png)
@@ -44,6 +48,8 @@ Then open:
 ## Project Files
 
 - `blackjack.html` - main game UI and logic
+- `basic_strategy_enhc_obbo_h17_das.csv` - basic strategy source (loaded for the chart and strategy hints)
+- `assets/sounds/` - CC0 casino/card foley (see `assets/sounds/ATTRIBUTION.txt`)
 - `serve.py` - simple local static server (port 8090)
 - `server.rb` - alternate simple server script
 - `Play Blackjack.command` - launcher script for macOS
