@@ -6,6 +6,7 @@
 
 ![Gameplay screenshot](assets/gameplay-1.png)
 
+⚠️ This app uses virtual units only and does not support real-money transactions or payments.
 
 ## Why I Built This
 
