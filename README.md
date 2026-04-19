@@ -1,8 +1,9 @@
 # Blackjack Trainer
 
-A single-page Blackjack trainer focused on realistic decision practice with a custom casino ruleset.
+**Blackjack strategy trainer** for learning and drilling basic strategy through full rounds, with a custom casino ruleset, chips, sound effects, and an interactive table UI.
 
-This project is designed to help you learn and drill basic strategy while playing full rounds in an interactive table UI with chips, sound effects, and dealer feedback.
+![Gameplay screenshot](assets/gameplay-1.png)
+
 
 ## Why I Built This
 
@@ -46,10 +47,6 @@ Then open:
 On macOS you can double-click **`Play Blackjack.command`**, which starts that server (if it is not already running) and opens the same URL. Do not open `index.html` directly from the Finder, or `fetch` will not load the CSV and sounds.
 
 While the game tab is open, the page pings the server every few seconds. About **5 seconds** after you close the tab (or stop pings), the server exits so it is not left running in the background.
-
-## Screenshots
-
-![Gameplay screenshot](assets/gameplay-1.png)
 
 ## Project Files
 
