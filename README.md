@@ -8,7 +8,7 @@ This project is designed to help you learn and drill basic strategy while playin
 
 Most blackjack trainers online optimise for generic strategy practice, but many use American hole-card rules rather than the European No Hole Card format more relevant to New Zealand.
 
-I wanted a trainer that was both more locally relevant while still having a nice appearance, so I built one that combines an NZ-style ruleset with a table presentation.
+I wanted a trainer that was both more locally relevant while still having a nice appearance, so I built one that combines an NZ-style ruleset with a table-like interface.
 
 ## What This Game Includes
 
