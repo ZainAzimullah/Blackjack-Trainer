@@ -2,6 +2,8 @@
 
 **Blackjack strategy trainer** for learning and drilling basic strategy through full rounds, with a custom casino ruleset, chips, sound effects, and an interactive table UI.
 
+**→ [blackjack-trainer-sigma-lovat.vercel.app](https://blackjack-trainer-sigma-lovat.vercel.app/)**
+
 ![Gameplay screenshot](assets/gameplay-1.png)
 
 
