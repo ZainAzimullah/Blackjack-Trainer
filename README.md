@@ -4,6 +4,12 @@ A single-page Blackjack trainer focused on realistic decision practice with a cu
 
 This project is designed to help you learn and drill basic strategy while playing full rounds in an interactive table UI with chips, sound effects, and dealer feedback.
 
+## Why I Built This
+
+Most blackjack trainers online optimise for generic strategy practice, but many use American hole-card rules rather than the European No Hole Card format more relevant to New Zealand.
+
+I wanted a trainer that was both more locally relevant while still having a nice appearance, so I built one that combines an NZ-style ruleset with a table presentation.
+
 ## What This Game Includes
 
 - Interactive Blackjack table UI (`blackjack.html`)
@@ -37,7 +43,7 @@ Then open:
 
 `http://127.0.0.1:8090/blackjack.html`
 
-On macOS you can double-click **`Play Blackjack.command`**, which starts that server (if it is not already running) and opens the same URL. Do not open `blackjack.html` directly from the Finder, or `fetch` will not load the CSV and sounds.
+On macOS you can double-click **`Play Blackjack.command`**, which starts that server (if it is not already running) and opens the same URL. Do not open `index.html` directly from the Finder, or `fetch` will not load the CSV and sounds.
 
 While the game tab is open, the page pings the server every few seconds. About **5 seconds** after you close the tab (or stop pings), the server exits so it is not left running in the background.
 
@@ -47,7 +53,7 @@ While the game tab is open, the page pings the server every few seconds. About *
 
 ## Project Files
 
-- `blackjack.html` - main game UI and logic
+- `index.html` - main game UI and logic
 - `basic_strategy_enhc_obbo_h17_das.csv` - basic strategy source (loaded for the chart and strategy hints)
 - `assets/sounds/` - CC0 casino/card foley (see `assets/sounds/ATTRIBUTION.txt`)
 - `serve.py` - simple local static server (port 8090)
